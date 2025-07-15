@@ -207,7 +207,7 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         }
     }
 
-    pub fn add(&mut self, item: &T, increment: u64) {
+    pub fn add(&mut self, item: &T, increment: u64) -> Option<u64> {
         let mut composer = HashComposer::new(&self.hasher, item);
         let mut max_count: u64 = 0;
 
@@ -260,12 +260,13 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         if self.priority_queue.is_full() {
             // Only check min_count if queue is full
             if max_count < self.priority_queue.min_count() {
-                return;
+                return None;
             }
         }
 
         // Clone the item here since we need to store it in the priority queue
         self.priority_queue.upsert(item.clone(), max_count);
+        Some(max_count)
     }
 
     pub fn list(&self) -> Vec<Node<T>> {
