@@ -178,6 +178,16 @@ impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T> {
             *pos_j = j;
         }
     }
+
+    pub fn scale_counts(&mut self, scale_factor: f64) {
+        for entry in self.heap.iter_mut() {
+            entry.0 = (entry.0 as f64 * scale_factor) as u64;
+        }
+
+        for (_item, (count, _)) in self.items.iter_mut() {
+            *count = (*count as f64 * scale_factor) as u64;
+        }
+    }
 }
 
 #[cfg(test)]

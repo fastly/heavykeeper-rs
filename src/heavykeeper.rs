@@ -363,6 +363,16 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
 
         Ok(())
     }
+
+    pub fn scale_bucket_counts(&mut self, scale_factor: f64) {
+        self.priority_queue.scale_counts(scale_factor);
+
+        for row in self.buckets.iter_mut() {
+            for bucket in row.iter_mut() {
+                bucket.count = (bucket.count as f64 * scale_factor) as u64;
+            }
+        }
+    }
 }
 
 impl<T: Ord + Clone + Hash + Debug> Builder<T> {
