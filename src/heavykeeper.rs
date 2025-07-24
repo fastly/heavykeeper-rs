@@ -3,6 +3,7 @@ use crate::priority_queue::TopKQueue;
 use ahash::RandomState;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
+use std::borrow::Borrow;
 use std::clone::Clone;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -165,7 +166,11 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         }
     }
 
-    pub fn query(&self, item: &T) -> bool {
+    pub fn query<Q>(&self, item: &Q) -> bool
+    where
+        T: Borrow<Q>,
+        Q: Hash + Eq + ToOwned<Owned = T> + ?Sized,
+    {
         if self.priority_queue.get(item).is_some() {
             return true;
         }
@@ -185,7 +190,11 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         min_count != u64::MAX
     }
 
-    pub fn count(&self, item: &T) -> u64 {
+    pub fn count<Q>(&self, item: &Q) -> u64
+    where
+        T: Borrow<Q>,
+        Q: Hash + Eq + ToOwned<Owned = T> + ?Sized,
+    {
         if let Some(count) = self.priority_queue.get(item) {
             return count;
         }
@@ -210,7 +219,11 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
     }
 
     #[cfg(test)]
-    pub fn bucket_count(&self, item: &T) -> u64 {
+    pub fn bucket_count<Q>(&self, item: &Q) -> u64
+    where
+        T: Borrow<Q>,
+        Q: Hash + Eq + ToOwned<Owned = T> + ?Sized,
+    {
         let mut composer = HashComposer::new(&self.hasher, item);
         let mut min_count = u64::MAX;
 
@@ -230,7 +243,11 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         }
     }
 
-    pub fn add(&mut self, item: &T, increment: u64) {
+    pub fn add<Q>(&mut self, item: &Q, increment: u64) -> Option<u64>
+    where
+        T: Borrow<Q>,
+        Q: Hash + Eq + ToOwned<Owned = T> + ?Sized,
+    {
         let mut composer = HashComposer::new(&self.hasher, item);
         let mut max_count: u64 = 0;
 
@@ -284,12 +301,13 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         if self.priority_queue.is_full() {
             // Only check min_count if queue is full
             if max_count < self.priority_queue.min_count() {
-                return;
+                return None;
             }
         }
 
         // Clone the item here since we need to store it in the priority queue
-        self.priority_queue.upsert(item.clone(), max_count);
+        self.priority_queue.upsert(item.to_owned(), max_count);
+        Some(max_count)
     }
 
     pub fn list(&self) -> Vec<Node<T>> {
@@ -393,6 +411,16 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         }
 
         Ok(())
+    }
+
+    pub fn scale_bucket_counts(&mut self, scale_factor: f64) {
+        self.priority_queue.scale_counts(scale_factor);
+
+        for row in self.buckets.iter_mut() {
+            for bucket in row.iter_mut() {
+                bucket.count = (bucket.count as f64 * scale_factor) as u64;
+            }
+        }
     }
 }
 
@@ -1323,5 +1351,21 @@ mod tests {
             let topk = TopK::new(10, 100, 5, 0.9);
             map.insert("test".to_string(), topk);
         });
+    }
+
+    /// Tests that `add` accepts borrowed values (e.g., &str and &[u8])
+    #[test]
+    fn test_borrow() {
+        let mut topk: TopK<String> = TopK::new(10, 100, 5, 0.9);
+        let item: &str = "foo";
+        topk.add(item, 1);
+        assert!(topk.query(item));
+        assert_eq!(topk.count(item), 1);
+
+        let mut topk: TopK<Vec<u8>> = TopK::new(10, 100, 5, 0.9);
+        let item: &[u8] = b"foo";
+        topk.add(item, 1);
+        assert!(topk.query(item));
+        assert_eq!(topk.count(item), 1);
     }
 }

@@ -1,4 +1,5 @@
 use ahash::RandomState;
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -33,7 +34,11 @@ impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T> {
         self.items.len()
     }
 
-    pub(crate) fn get(&self, item: &T) -> Option<u64> {
+    pub(crate) fn get<Q>(&self, item: &Q) -> Option<u64>
+    where
+        T: Borrow<Q>,
+        Q: Hash + Eq + ToOwned<Owned = T> + ?Sized,
+    {
         self.items.get(item).map(|(count, _)| *count)
     }
 
@@ -188,6 +193,16 @@ impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T> {
         }
         if let Some((_, pos_j)) = self.items.get_mut(item_j) {
             *pos_j = j;
+        }
+    }
+
+    pub fn scale_counts(&mut self, scale_factor: f64) {
+        for entry in self.heap.iter_mut() {
+            entry.0 = (entry.0 as f64 * scale_factor) as u64;
+        }
+
+        for (_item, (count, _)) in self.items.iter_mut() {
+            *count = (*count as f64 * scale_factor) as u64;
         }
     }
 }
