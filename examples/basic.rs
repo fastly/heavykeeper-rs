@@ -22,10 +22,16 @@ fn main() {
 
     // Demonstrate the count() method
     let item = b"frequent item".to_vec();
-    println!("\nCount for '{}': {}", String::from_utf8_lossy(&item), topk.count(&item));
+    println!(
+        "\nCount for '{}': {}",
+        String::from_utf8_lossy(&item),
+        topk.count(&item)
+    );
 
     // Demonstrate the query() method
-    println!("Is '{}' in top-k? {}", 
+    println!(
+        "Is '{}' in top-k? {}",
         String::from_utf8_lossy(&item),
-        if topk.query(&item) { "yes" } else { "no" });
+        if topk.query(&item) { "yes" } else { "no" }
+    );
 }
