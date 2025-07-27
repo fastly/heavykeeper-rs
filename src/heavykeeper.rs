@@ -1,8 +1,11 @@
 use crate::hash_composition::HashComposer;
 use crate::priority_queue::TopKQueue;
 use ahash::RandomState;
+<<<<<<< HEAD
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
+=======
+>>>>>>> main
 use std::borrow::Borrow;
 use std::clone::Clone;
 use std::fmt::Debug;
@@ -243,7 +246,11 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         }
     }
 
+<<<<<<< HEAD
     pub fn add<Q>(&mut self, item: &Q, increment: u64) -> Option<u64>
+=======
+    pub fn add<Q>(&mut self, item: &Q, increment: u64)
+>>>>>>> main
     where
         T: Borrow<Q>,
         Q: Hash + Eq + ToOwned<Owned = T> + ?Sized,
@@ -307,7 +314,10 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
 
         // Clone the item here since we need to store it in the priority queue
         self.priority_queue.upsert(item.to_owned(), max_count);
+<<<<<<< HEAD
         Some(max_count)
+=======
+>>>>>>> main
     }
 
     pub fn list(&self) -> Vec<Node<T>> {
@@ -1352,6 +1362,26 @@ mod tests {
             map.insert("test".to_string(), topk);
         });
     }
+<<<<<<< HEAD
+=======
+
+    /// Tests that `add` accepts borrowed values (e.g., &str and &[u8])
+    #[test]
+    fn test_borrow() {
+        let mut topk: TopK<String> = TopK::new(10, 100, 5, 0.9);
+        let item: &str = "foo";
+        topk.add(item, 1);
+        assert!(topk.query(item));
+        assert_eq!(topk.count(item), 1);
+
+        let mut topk: TopK<Vec<u8>> = TopK::new(10, 100, 5, 0.9);
+        let item: &[u8] = b"foo";
+        topk.add(item, 1);
+        assert!(topk.query(item));
+        assert_eq!(topk.count(item), 1);
+    }
+}
+>>>>>>> main
 
     /// Tests that `add` accepts borrowed values (e.g., &str and &[u8])
     #[test]
