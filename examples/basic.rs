@@ -20,29 +20,14 @@ fn main() {
         println!("{}: {}", node.item, node.count);
     }
 
-<<<<<<< HEAD
     // Demonstrate the count() method
-    let item = b"frequent item".to_vec();
-    println!(
-        "\nCount for '{}': {}",
-        String::from_utf8_lossy(&item),
-        topk.count(&item)
-    );
+    let item = "frequent item";
+    println!("\nCount for '{}': {}", item, topk.count(item));
 
     // Demonstrate the query() method
     println!(
         "Is '{}' in top-k? {}",
-        String::from_utf8_lossy(&item),
-        if topk.query(&item) { "yes" } else { "no" }
-    );
-=======
-    // Demonstrate the count() method 
-    let item = "frequent item";
-    println!("\nCount for '{}': {}", item, topk.count(item));
-
-    // Demonstrate the query() method 
-    println!("Is '{}' in top-k? {}", 
         item,
-        if topk.query(item) { "yes" } else { "no" });
->>>>>>> origin/main
+        if topk.query(item) { "yes" } else { "no" }
+    );
 }
