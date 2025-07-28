@@ -1,0 +1,111 @@
+name: Upstream Sync
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Run daily
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  upstream-sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/pmcgleenon/heavykeeper-rs.git || true
+          git fetch upstream
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          git fetch upstream main
+          git fetch origin main
+          git fetch origin fastly-stable
+
+          LOCAL_MAIN=$(git rev-parse origin/main)
+          UPSTREAM_MAIN=$(git rev-parse upstream/main)
+
+          # Always force sync main to upstream
+          echo "sync_main=true" >> $GITHUB_OUTPUT
+          echo "upstream_commit=$UPSTREAM_MAIN" >> $GITHUB_OUTPUT
+
+          # Check if upstream has changes not in fastly-stable
+          MERGE_BASE=$(git merge-base upstream/main origin/fastly-stable)
+          if [ "$MERGE_BASE" != "$UPSTREAM_MAIN" ]; then
+            echo "need_pr=true" >> $GITHUB_OUTPUT
+          else
+            echo "need_pr=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Force sync main branch
+        if: steps.check_changes.outputs.sync_main == 'true'
+        run: |
+          git push origin upstream/main:main --force
+
+      - name: Create PR to fastly-stable
+        if: steps.check_changes.outputs.need_pr == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create a new branch for the PR
+          SHORT_COMMIT=$(echo "${{ steps.check_changes.outputs.upstream_commit }}" | cut -c1-7)
+          BRANCH_NAME="upstream-sync-${SHORT_COMMIT}"
+
+          # Check if branch already exists
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME" > /dev/null 2>&1; then
+            echo "Branch $BRANCH_NAME already exists, skipping PR creation"
+            exit 0
+          fi
+
+          git checkout fastly-stable
+          git checkout -b "$BRANCH_NAME"
+
+          # Merge the updated main branch (allow conflicts)
+          git merge origin/main --no-edit || true
+
+          # If there are conflicts, commit them as-is
+          HAS_CONFLICTS=false
+          if ! git diff --quiet; then
+            git add -A
+            git commit -m "Merge main with conflicts - manual resolution needed"
+            HAS_CONFLICTS=true
+          fi
+
+          # Push the branch
+          git push origin "$BRANCH_NAME"
+
+          # Create PR with conditional conflict message
+          if [ "$HAS_CONFLICTS" = "true" ]; then
+            CONFLICT_NOTE="⚠️ **Note**: This PR contains merge conflicts that need to be resolved manually."
+          else
+            CONFLICT_NOTE=""
+          fi
+
+          # Build PR body
+          PR_BODY="This PR synchronizes the latest changes from the upstream repository https://github.com/pmcgleenon/heavykeeper-rs into the fastly-stable branch.
+
+          **Upstream commit**: ${{ steps.check_changes.outputs.upstream_commit }}
+
+          ${CONFLICT_NOTE}
+
+          Please review the changes and merge if appropriate."
+
+          gh pr create \
+            --repo ${{ github.repository }} \
+            --title "Upstream sync: Merge latest changes from pmcgleenon/heavykeeper-rs (${SHORT_COMMIT})" \
+            --body "$PR_BODY" \
+            --base fastly-stable \
+            --head "$BRANCH_NAME"
