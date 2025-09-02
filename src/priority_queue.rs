@@ -52,11 +52,12 @@ impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T> {
         self.items.len() >= self.capacity
     }
 
-    pub(crate) fn upsert(&mut self, item: T, count: u64) {
+    /// Returns `Some(k)` if the existing item `k` is evicted, otherwise None
+    pub(crate) fn upsert(&mut self, item: T, count: u64) -> Option<T> {
         // Fast path: update existing item
         if let Some((old_count, pos)) = self.items.get_mut(&item) {
             if count == *old_count {
-                return;
+                return None;
             }
             *old_count = count;
 
@@ -66,7 +67,7 @@ impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T> {
             self.heap[pos] = (count, self.heap[pos].1, item_idx);
             self.sift_down(pos);
             self.sift_up(pos);
-            return;
+            return None;
         }
 
         // For new items, if we have space just add it
@@ -86,23 +87,23 @@ impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T> {
             self.heap.push((count, self.sequence, item_idx));
             self.items.insert(item, (count, pos));
             self.sift_up(pos);
-            return;
+            return None;
         }
 
         // Queue is full - check if new count beats minimum
         if let Some(&(min_count, _, item_idx)) = self.heap.first() {
             if count > min_count {
-                let old_item = &self.item_store[item_idx];
-                self.items.remove(old_item);
-
                 // Reuse the item slot
-                self.item_store[item_idx] = item.clone();
+                let old_item = std::mem::replace(&mut self.item_store[item_idx], item.clone());
+                self.items.remove(&old_item);
                 self.items.insert(item, (count, 0));
                 self.sequence += 1;
                 self.heap[0] = (count, self.sequence, item_idx);
                 self.sift_down(0);
+                return Some(old_item);
             }
         }
+        None
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&T, u64)> {
