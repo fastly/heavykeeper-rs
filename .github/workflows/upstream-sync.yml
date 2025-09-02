@@ -32,14 +32,9 @@ jobs:
         id: check_changes
         run: |
           git fetch upstream main
-          git fetch origin main
           git fetch origin fastly-stable
 
-          LOCAL_MAIN=$(git rev-parse origin/main)
           UPSTREAM_MAIN=$(git rev-parse upstream/main)
-
-          # Always force sync main to upstream
-          echo "sync_main=true" >> $GITHUB_OUTPUT
           echo "upstream_commit=$UPSTREAM_MAIN" >> $GITHUB_OUTPUT
 
           # Check if upstream has changes not in fastly-stable
@@ -49,11 +44,6 @@ jobs:
           else
             echo "need_pr=false" >> $GITHUB_OUTPUT
           fi
-
-      - name: Force sync main branch
-        if: steps.check_changes.outputs.sync_main == 'true'
-        run: |
-          git push origin upstream/main:main --force
 
       - name: Create PR to fastly-stable
         if: steps.check_changes.outputs.need_pr == 'true'
@@ -73,8 +63,8 @@ jobs:
           git checkout fastly-stable
           git checkout -b "$BRANCH_NAME"
 
-          # Merge the updated main branch (allow conflicts)
-          git merge origin/main --no-edit || true
+          # Merge the upstream main branch (allow conflicts)
+          git merge upstream/main --no-edit || true
 
           # If there are conflicts, commit them as-is
           HAS_CONFLICTS=false
