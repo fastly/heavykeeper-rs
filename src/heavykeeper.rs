@@ -243,7 +243,7 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         }
     }
 
-    pub fn add<Q>(&mut self, item: &Q, increment: u64) -> Option<u64>
+    pub fn add<Q>(&mut self, item: &Q, increment: u64) -> Option<(u64, Option<T>)>
     where
         T: Borrow<Q>,
         Q: Hash + Eq + ToOwned<Owned = T> + ?Sized,
@@ -306,8 +306,8 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         }
 
         // Clone the item here since we need to store it in the priority queue
-        self.priority_queue.upsert(item.to_owned(), max_count);
-        Some(max_count)
+        let evicted = self.priority_queue.upsert(item.to_owned(), max_count);
+        Some((max_count, evicted))
     }
 
     pub fn list(&self) -> Vec<Node<T>> {
