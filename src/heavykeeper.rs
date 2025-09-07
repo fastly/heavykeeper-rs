@@ -75,7 +75,7 @@ pub struct TopK<T: Ord + Clone + Hash + Debug> {
     buckets: Vec<Vec<Bucket>>,
     priority_queue: TopKQueue<T>,
     hasher: RandomState,
-    random: Box<dyn RngCore + Send>,
+    random: Box<dyn RngCore + Send + Sync>,
 }
 
 pub struct Builder<T> {
@@ -85,7 +85,7 @@ pub struct Builder<T> {
     decay: Option<f64>,
     seed: Option<u64>,
     hasher: Option<RandomState>,
-    rng: Option<Box<dyn RngCore + Send>>,
+    rng: Option<Box<dyn RngCore + Send + Sync>>,
     _phantom: std::marker::PhantomData<T>,
 }
 
@@ -133,6 +133,7 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         )
     }
 
+<<<<<<< HEAD
     fn with_components(
         k: usize,
         width: usize,
@@ -141,6 +142,9 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         hasher: RandomState,
         rng: Box<dyn RngCore + Send>,
     ) -> Self {
+=======
+    fn with_components(k: usize, width: usize, depth: usize, decay: f64, hasher: RandomState, rng: Box<dyn RngCore + Send + Sync>) -> Self {
+>>>>>>> origin/main
         // Pre-allocate with capacity to avoid resizing
         let mut buckets = Vec::with_capacity(depth);
         for _ in 0..depth {
@@ -430,6 +434,12 @@ impl<T: Ord + Clone + Hash + Debug> Default for Builder<T> {
     }
 }
 
+impl<T: Ord + Clone + Hash + Debug> Default for Builder<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Ord + Clone + Hash + Debug> Builder<T> {
     pub fn new() -> Self {
         Self {
@@ -474,7 +484,7 @@ impl<T: Ord + Clone + Hash + Debug> Builder<T> {
         self
     }
 
-    pub fn rng<R: RngCore + Send + 'static>(mut self, rng: R) -> Self {
+    pub fn rng<R: RngCore + Send + Sync + 'static>(mut self, rng: R) -> Self {
         self.rng = Some(Box::new(rng));
         self
     }
