@@ -18,18 +18,19 @@ struct Bucket {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Node<T> {
+pub struct Node<T, A = ()> {
     pub item: T,
     pub count: u64,
+    pub data: A,
 }
 
-impl<T: Ord> Ord for Node<T> {
+impl<T: Ord, A: PartialEq + Eq> Ord for Node<T, A> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         other.count.cmp(&self.count) // Reverse ordering for min-heap
     }
 }
 
-impl<T: Ord> PartialOrd for Node<T> {
+impl<T: Ord, A: PartialEq + Eq> PartialOrd for Node<T, A> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
@@ -66,14 +67,14 @@ pub enum BuilderError {
     MissingField { field: String },
 }
 
-pub struct TopK<T: Ord + Clone + Hash + Debug> {
+pub struct TopK<T: Ord + Clone + Hash + Debug, A: Clone + Default + PartialEq + Eq = ()> {
     top_items: usize,
     width: usize,
     depth: usize,
     decay: f64,
     decay_thresholds: Vec<u64>,
     buckets: Vec<Vec<Bucket>>,
-    priority_queue: TopKQueue<T>,
+    priority_queue: TopKQueue<T, A>,
     hasher: RandomState,
     random: Box<dyn RngCore + Send>,
 }
@@ -99,7 +100,7 @@ fn precompute_decay_thresholds(decay: f64, num_entries: usize) -> Vec<u64> {
     thresholds
 }
 
-impl<T: Ord + Clone + Hash + Debug> TopK<T> {
+impl<T: Ord + Clone + Hash + Debug, A: Clone + Default + PartialEq + Eq> TopK<T, A> {
     pub fn builder() -> Builder<T> {
         Builder::new()
     }
@@ -243,7 +244,7 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         }
     }
 
-    pub fn add<Q>(&mut self, item: &Q, increment: u64) -> Option<(u64, Option<T>)>
+    pub fn add<Q>(&mut self, item: &Q, increment: u64) -> Option<(u64, A)>
     where
         T: Borrow<Q>,
         Q: Hash + Eq + ToOwned<Owned = T> + ?Sized,
@@ -306,17 +307,18 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         }
 
         // Clone the item here since we need to store it in the priority queue
-        let evicted = self.priority_queue.upsert(item.to_owned(), max_count);
-        Some((max_count, evicted))
+        let data = self.priority_queue.upsert(item.to_owned(), max_count)?;
+        Some((max_count, data))
     }
 
-    pub fn list(&self) -> Vec<Node<T>> {
+    pub fn list(&self) -> Vec<Node<T, A>> {
         let mut nodes = self
             .priority_queue
             .iter()
-            .map(|(item, count)| Node {
+            .map(|(item, count, associated_data)| Node {
                 item: item.clone(),
                 count,
+                data: associated_data.clone(),
             })
             .collect::<Vec<_>>();
         nodes.sort();
@@ -347,9 +349,10 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         let mut nodes = self
             .priority_queue
             .iter()
-            .map(|(item, count)| Node {
+            .map(|(item, count, associated_data)| Node {
                 item: item.clone(),
                 count,
+                data: associated_data.clone(),
             })
             .collect::<Vec<_>>();
 
@@ -405,7 +408,7 @@ impl<T: Ord + Clone + Hash + Debug> TopK<T> {
         }
 
         // Merge priority queues
-        for (item, count) in other.priority_queue.iter() {
+        for (item, count, _associated_data) in other.priority_queue.iter() {
             let self_count = self.priority_queue.get(item).unwrap_or(0);
             self.priority_queue.upsert(item.clone(), self_count + count);
         }
@@ -720,9 +723,10 @@ mod tests {
         let nodes = topk
             .priority_queue
             .iter()
-            .map(|(item, count)| Node {
+            .map(|(item, count, associated_data)| Node {
                 item: item.clone(),
                 count,
+                data: associated_data.clone(),
             })
             .collect::<Vec<_>>();
 
@@ -840,9 +844,10 @@ mod tests {
         let top_items = topk
             .priority_queue
             .iter()
-            .map(|(item, count)| Node {
+            .map(|(item, count, associated_data)| Node {
                 item: std::str::from_utf8(item).unwrap().to_string().into_bytes(),
                 count,
+                data: associated_data.clone(),
             })
             .collect::<Vec<_>>();
 
@@ -1014,9 +1019,10 @@ mod tests {
         let top_items = topk
             .priority_queue
             .iter()
-            .map(|(item, count)| Node {
+            .map(|(item, count, associated_data)| Node {
                 item: std::str::from_utf8(item).unwrap().to_string().into_bytes(),
                 count,
+                data: associated_data.clone(),
             })
             .collect::<Vec<_>>();
 
