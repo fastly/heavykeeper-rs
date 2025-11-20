@@ -107,6 +107,7 @@ impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T> {
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&T, u64)> {
+<<<<<<< HEAD
         let mut items: Vec<_> = self.items.iter().map(|(k, v)| (k, v.0)).collect();
         // Sort by count descending, then by sequence ascending
         items.sort_unstable_by(|(k1, v1), (k2, v2)| {
@@ -129,8 +130,27 @@ impl<T: Ord + Clone + Hash + PartialEq> TopKQueue<T> {
                 }
                 other => other,
             }
+=======
+        // Materialize (key, count, sequence) using stored heap index so
+        // per-comparison work is O(1) instead of scanning the heap.
+        let mut items: Vec<_> = self
+            .items
+            .iter()
+            .map(|(k, (count, heap_idx))| {
+                let seq = self.heap[*heap_idx].1;
+                (k, *count, seq)
+            })
+            .collect();
+
+        // Sort by count descending, then by sequence ascending.
+        items.sort_unstable_by(|(_, c1, s1), (_, c2, s2)| match c2.cmp(c1) {
+            std::cmp::Ordering::Equal => s1.cmp(s2),
+            other => other,
+>>>>>>> origin/main
         });
-        items.into_iter()
+
+        // Return an iterator over (&T, count), preserving sorted order.
+        items.into_iter().map(|(k, count, _)| (k, count))
     }
 
     // Binary heap helper methods using Eytzinger layout (0-based indexing)
